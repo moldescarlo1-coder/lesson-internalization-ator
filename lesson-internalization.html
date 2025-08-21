@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lesson Internalization Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0d9488;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 sm:p-8">
+
+    <!-- Chosen Palette: Tailwind's default grays, teal, and stone. -->
+    <!-- Application Structure Plan: The SPA is a single-page tool. The top section is for input (file uploads, generate button), and the bottom section is for output (editable text area, export buttons). This linear, task-oriented flow guides the user from data input to content generation and final export, simplifying the process. -->
+    <!-- Visualization & Content Choices: 
+        - Lesson Plan & Materials -> Goal: Input -> File Upload UI & Image Previews -> User selects files -> Justification: Provides a clear, standard way for the user to provide the source material.
+        - Generated Lesson Internalization -> Goal: Output & Edit -> Editable Text Area -> User can make changes -> Justification: Allows for human review and refinement of the AI-generated content before export.
+        - Export Buttons -> Goal: Finalization -> Standard buttons linked to JS export functions -> User downloads the file -> Justification: Provides the requested functionality for saving the final product in a usable format. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <div class="container bg-white p-6 md:p-10 rounded-xl shadow-lg">
+
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-800">Lesson Internalization Generator ✨</h1>
+            <p class="mt-2 text-gray-600">Upload your lesson plan and materials, and let the AI fill out your internalization template for you.</p>
+        </header>
+
+        <section class="mb-8 p-6 bg-stone-100 rounded-lg">
+            <h2 class="text-xl font-semibold mb-4 text-teal-700">1. Upload Your Documents</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="lessonPlan" class="block text-sm font-medium text-gray-700 mb-1">Lesson Plan (PDF):</label>
+                    <input type="file" id="lessonPlan" accept="application/pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"/>
+                </div>
+                <div>
+                    <label for="materials" class="block text-sm font-medium text-gray-700 mb-1">Supporting Materials (Images, PDFs, Word Docs):</label>
+                    <!-- Updated accept attribute to include more file types -->
+                    <input type="file" id="materials" accept="image/jpeg, image/png, application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"/>
+                    <div id="imagePreview" class="mt-4 flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+            
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold mb-2 text-teal-700">2. Choose Your Material Integration Style</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center">
+                        <input type="radio" id="followPlan" name="integrationStyle" value="followPlan" class="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500" checked>
+                        <label for="followPlan" class="ml-2 text-sm text-gray-700">Follow the lesson plan's suggested usage.</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="radio" id="aiSuggests" name="integrationStyle" value="aiSuggests" class="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500">
+                        <label for="aiSuggests" class="ml-2 text-sm text-gray-700">Let the AI suggest how to use the materials in the schedule.</label>
+                    </div>
+                </div>
+            </div>
+
+            <button id="generateBtn" class="mt-6 w-full flex justify-center items-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-colors">
+                <span id="btnText">Generate Lesson Internalization</span>
+                <div id="btnSpinner" class="hidden loading-spinner ml-2"></div>
+            </button>
+            <p id="statusMessage" class="mt-4 text-center text-sm font-medium text-gray-500"></p>
+        </section>
+
+        <section class="p-6 bg-stone-100 rounded-lg">
+            <h2 class="text-xl font-semibold mb-4 text-teal-700">3. Review & Export</h2>
+            <p class="text-sm text-gray-600 mb-4">Edit the generated content as needed before exporting.</p>
+            <div contenteditable="true" id="editor" class="w-full h-[600px] p-4 bg-white rounded-md border border-gray-300 focus:outline-none focus:border-teal-500 overflow-y-scroll transition">
+                <p class="text-gray-400 italic">Your generated lesson internalization will appear here...</p>
+            </div>
+            
+            <div class="mt-4 flex flex-col sm:flex-row justify-end gap-3">
+                <button id="exportWordBtn" class="py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">Export as Word Document</button>
+                <button id="exportPdfBtn" class="py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">Export as PDF</button>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        window.jsPDF = window.jspdf.jsPDF;
+
+        const lessonPlanInput = document.getElementById('lessonPlan');
+        const materialsInput = document.getElementById('materials');
+        const generateBtn = document.getElementById('generateBtn');
+        const btnText = document.getElementById('btnText');
+        const btnSpinner = document.getElementById('btnSpinner');
+        const statusMessage = document.getElementById('statusMessage');
+        const editor = document.getElementById('editor');
+        const imagePreview = document.getElementById('imagePreview');
+        const exportWordBtn = document.getElementById('exportWordBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+
+        const blankTemplate = `
+            ### Biology Lesson Internalization Template
+
+            **Teacher:** [Your Name]
+
+            **Lesson Date/s:** [Date Range]
+
+            **Lesson Title/Topic:** [Lesson Topic]
+
+            **Focus TEKs:** [Relevant TEKS codes]
+
+            **ELPs:** [Relevant ELPS codes]
+
+            **Measurable Objective(s):**
+            By the end of this unit, **[Percentage]% of students will be able to** [describe the measurable skill or content] with [accuracy metric] on the unit assessment.
+
+            ### Part 1: Pre-Lesson Prep & Planning
+
+            #### Guiding Questions
+            * What's the main thing I want my students to walk away with from this lesson?
+            * How does this topic connect to what we've already learned and what's coming up next?
+            * What's the most challenging part of this lesson for students, and how can I make it easier to understand?
+
+            #### Prior Student Knowledge
+            * What foundational concepts from earlier in the year or from previous grades should my students already know?
+            * What common gaps or misunderstandings from previous topics might pop up again here?
+
+            #### Vocabulary
+            * **[Vocabulary Term 1]:** [How will you introduce this term to the students? Will you use a specific activity or a real-world example?]
+            * **[Vocabulary Term 2]:** [How will you introduce this term to the students? Will you use a specific activity or a real-world example?]
+            * **[Vocabulary Term 3]:** [How will you introduce this term to the students? Will you use a specific activity or a real-world example?]
+
+            #### Possible Preconceptions
+            * **Misconception:** [What's a common, incorrect idea students might have about this topic?]
+            * **Correction:** [What's my plan to address this? Should I challenge it directly or create a scenario where they discover the correct concept themselves?]
+            * **Misconception:** [What's another common, incorrect idea students might have about this topic?]
+            * **Correction:** [What's my plan to address this? Should I challenge it directly or create a scenario where they discover the correct concept themselves?]
+
+            ### Part 2: Daily Lesson Plan & Differentiation
+
+            #### Day 1:
+            **DO NOW:**
+            * [Describe the brief warm-up or opening question to get students thinking.]
+
+            **Exploration & Elaboration Activities:**
+            1. [Describe Activity 1 and its purpose.]
+            2. [Describe Activity 2 and its purpose.]
+
+            **Closure:**
+            * **EVALUATE:** [How will you wrap up the day? Describe the exit ticket or quick check for understanding.]
+
+            **Small Group Differentiation Strategies:**
+            * **For 504 Students & Special Populations:** [What specific supports or modifications will I provide?]
+            * **For Emergent Bilinguals:** [What specific supports or modifications will I provide?]
+            * **Other Needs:** [How will I challenge my high-flyers or give extra support to those who need it?]
+
+            #### Day 2:
+            **DO NOW:**
+            * [Describe the brief warm-up or opening question to get students thinking.]
+
+            **Exploration & Elaboration Activities:**
+            1. [Describe Activity 1 and its purpose.]
+            2. [Describe Activity 2 and its purpose.]
+
+            **Closure:**
+            * **EVALUATE:** [How will you wrap up the day? Describe the exit ticket or quick check for understanding.]
+
+            **Small Group Differentiation Strategies:**
+            * **For 504 Students & Special Populations:** [What specific supports or modifications will I provide?]
+            * **For Emergent Bilinguals:** [What specific supports or modifications will I provide?]
+            * **Other Needs:** [How will I challenge my high-flyers or give extra support to those who need it?]
+
+            #### Day 3:
+            **DO NOW:**
+            * [Describe the brief warm-up or opening question to get students thinking.]
+
+            **Exploration & Elaboration Activities:**
+            1. [Describe Activity 1 and its purpose.]
+            2. [Describe Activity 2 and its purpose.]
+
+            **Closure:**
+            * **EVALUATE:** [How will you wrap up the day? Describe the exit ticket or quick check for understanding.]
+
+            **Small Group Differentiation Strategies:**
+            * **For 504 Students & Special Populations:** [What specific supports or modifications will I provide?]
+            * **For Emergent Bilinguals:** [What specific supports or modifications will I provide?]
+            * **Other Needs:** [How will I challenge my high-flyers or give extra support to those who need it?]
+
+            #### Day 4:
+            **DO NOW:**
+            * [Describe the brief warm-up or opening question to get students thinking.]
+
+            **Exploration & Elaboration Activities:**
+            1. [Describe Activity 1 and its purpose.]
+            2. [Describe Activity 2 and its purpose.]
+
+            **Closure:**
+            * **EVALUATE:** [How will you wrap up the day? Describe the exit ticket or quick check for understanding.]
+
+            **Small Group Differentiation Strategies:**
+            * **For 504 Students & Special Populations:** [What specific supports or modifications will I provide?]
+            * **For Emergent Bilinguals:** [What specific supports or modifications will I provide?]
+            * **Other Needs:** [How will I challenge my high-flyers or give extra support to those who need it?]
+
+            #### Day 5:
+            **DO NOW:**
+            * [Describe the brief warm-up or opening question to get students thinking.]
+
+            **Exploration & Elaboration Activities:**
+            1. [Describe Activity 1 and its purpose.]
+            2. [Describe Activity 2 and its purpose.]
+
+            **Closure:**
+            * **EVALUATE:** [How will you wrap up the day? Describe the exit ticket or quick check for understanding.]
+
+            **Small Group Differentiation Strategies:**
+            * **For 504 Students & Special Populations:** [What specific supports or modifications will I provide?]
+            * **For Emergent Bilinguals:** [What specific supports or modifications will I provide?]
+            * **Other Needs:** [How will I challenge my high-flyers or give extra support to those who need it?]
+
+            ### Part 3: Artifacts
+            *This section is your digital locker for all lesson materials.*
+
+            * **Worksheets/Labs:** [List of materials]
+            * **Slideshows:** [List of materials]
+            * **Assessments:** [List of materials]
+            * **Supplemental Materials:** [List of materials]
+        `;
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                generateBtn.disabled = true;
+                btnText.textContent = 'Generating...';
+                btnSpinner.classList.remove('hidden');
+                statusMessage.textContent = 'Processing your documents...';
+            } else {
+                generateBtn.disabled = false;
+                btnText.textContent = 'Generate Lesson Internalization';
+                btnSpinner.classList.add('hidden');
+            }
+        }
+
+        async function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ data: reader.result.split(',')[1], mimeType: file.type });
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        materialsInput.addEventListener('change', (event) => {
+            imagePreview.innerHTML = '';
+            const files = event.target.files;
+            if (files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const previewItem = document.createElement('div');
+                    previewItem.className = 'flex flex-col items-center justify-center p-2 border border-gray-300 rounded-md bg-white shadow-sm';
+
+                    if (file.type.startsWith('image/')) {
+                        const img = document.createElement('img');
+                        img.src = URL.createObjectURL(file);
+                        img.className = 'w-16 h-16 object-cover rounded-md';
+                        previewItem.appendChild(img);
+                    } else if (file.type === 'application/pdf') {
+                        const icon = document.createElement('span');
+                        icon.textContent = '📄';
+                        icon.className = 'text-4xl';
+                        previewItem.appendChild(icon);
+                    } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                        const icon = document.createElement('span');
+                        icon.textContent = '📝';
+                        icon.className = 'text-4xl';
+                        previewItem.appendChild(icon);
+                    }
+
+                    const fileName = document.createElement('p');
+                    fileName.textContent = file.name;
+                    fileName.className = 'mt-1 text-xs text-gray-500 truncate w-24';
+                    previewItem.appendChild(fileName);
+
+                    imagePreview.appendChild(previewItem);
+                }
+            }
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            const lessonPlanFile = lessonPlanInput.files[0];
+            const materialFiles = materialsInput.files;
+            const integrationStyle = document.querySelector('input[name="integrationStyle"]:checked').value;
+
+            if (!lessonPlanFile) {
+                statusMessage.textContent = 'Please upload a lesson plan PDF.';
+                statusMessage.className = 'mt-4 text-center text-sm font-medium text-red-500';
+                return;
+            }
+
+            setLoading(true);
+            statusMessage.textContent = 'Analyzing your lesson plan and materials...';
+            statusMessage.className = 'mt-4 text-center text-sm font-medium text-gray-500';
+
+            try {
+                const base64LessonPlan = await fileToBase64(lessonPlanFile);
+                const base64Materials = await Promise.all(
+                    Array.from(materialFiles).map(fileToBase64)
+                );
+
+                let promptInstruction = '';
+                if (integrationStyle === 'followPlan') {
+                    promptInstruction = `For the supplemental materials (images and documents), please list them under the 'Artifacts' section in Part 3. Do not integrate them into the daily plans.`;
+                } else if (integrationStyle === 'aiSuggests') {
+                    promptInstruction = `For the supplemental materials (images and documents), analyze their content and suggest specific uses for them within the daily lesson plan sections (Part 2) and the pre-lesson planning sections (Part 1). For example, you might write, 'Use the provided diagram of a cell to guide a discussion on organelle function during the Day 1 Exploration activity.' After suggesting their use, also list them under the 'Artifacts' section.`;
+                }
+
+                const parts = [
+                    { text: `You are an expert educator. Your task is to fill out the following lesson internalization template using the provided lesson plan PDF and any additional material images and documents. The template is in Markdown format.
+
+                    Template to fill out:
+                    \`\`\`markdown
+                    ${blankTemplate}
+                    \`\`\`
+
+                    Here is the text from the lesson plan PDF and materials. Use this information to accurately fill in the template. Do not add any new sections or topics. Only fill in the provided template.
+
+                    ${promptInstruction}
+
+                    Lesson Plan (PDF):` },
+                    { inlineData: { mimeType: 'application/pdf', data: base64LessonPlan.data } }
+                ];
+
+                base64Materials.forEach(fileData => {
+                    parts.push({
+                        inlineData: { mimeType: fileData.mimeType, data: fileData.data }
+                    });
+                });
+
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: parts
+                    }],
+                };
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                let response;
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000;
+
+                while (retries < maxRetries) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.status !== 429) {
+                            break;
+                        }
+                    } catch (error) {
+                    }
+                    retries++;
+                    await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, retries)));
+                }
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const generatedText = result.candidates[0].content.parts[0].text;
+
+                editor.textContent = generatedText;
+                statusMessage.textContent = 'Generation complete! You can now review and export.';
+                statusMessage.className = 'mt-4 text-center text-sm font-medium text-green-700';
+            } catch (error) {
+                console.error("Error generating content:", error);
+                statusMessage.textContent = 'An error occurred. Please try again.';
+                statusMessage.className = 'mt-4 text-center text-sm font-medium text-red-500';
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        exportWordBtn.addEventListener('click', () => {
+            const content = editor.textContent;
+            const filename = "Lesson Internalization.doc";
+            const blob = new Blob([content], { type: "application/msword;charset=utf-8" });
+            saveAs(blob, filename);
+        });
+
+        exportPdfBtn.addEventListener('click', () => {
+            const content = editor.textContent;
+            const doc = new jspdf.jsPDF();
+            const margin = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const textLines = doc.splitTextToSize(content, pageWidth - margin * 2);
+            doc.setFontSize(12);
+            doc.text(textLines, margin, margin);
+            doc.save("Lesson Internalization.pdf");
+        });
+    </script>
+
+</body>
+</html>
